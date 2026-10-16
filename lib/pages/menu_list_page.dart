@@ -101,7 +101,6 @@ class _MenuListPageState extends State<MenuListPage> {
     final isWeb = screenWidth >= 800;
     final primaryColor = Theme.of(context).colorScheme.primary;
     final cartCount = CartService.instance.totalCount;
-    final cartSubtotal = CartService.instance.subtotal;
 
     int crossAxisCount;
     double childAspectRatio;
@@ -502,64 +501,6 @@ class _MenuListPageState extends State<MenuListPage> {
           ),
         ),
       ),
-
-      // 5. Floating Bottom Cart Bar (jika ada item di keranjang)
-      bottomSheet: cartCount > 0
-          ? Center(
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 1200),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.1),
-                        blurRadius: 10,
-                        offset: const Offset(0, -3),
-                      ),
-                    ],
-                  ),
-                  child: SafeArea(
-                    child: Row(
-                      children: [
-                        Column(
-                          mainAxisSize: MainAxisSize.min,
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              '$cartCount Menu di Keranjang',
-                              style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-                            ),
-                            Text(
-                              formatRupiah(cartSubtotal),
-                              style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                                color: primaryColor,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const Spacer(),
-                        ElevatedButton.icon(
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: primaryColor,
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 12),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                          ),
-                          onPressed: () => Navigator.pushNamed(context, '/pesan'),
-                          icon: const Icon(Icons.arrow_forward),
-                          label: const Text('Buka Keranjang', style: TextStyle(fontWeight: FontWeight.bold)),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            )
-          : null,
     );
   }
 

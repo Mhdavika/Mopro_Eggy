@@ -442,15 +442,19 @@ class _OrderPageState extends State<OrderPage> {
 
     final generatedOrderId = 'BS-${(DateTime.now().millisecondsSinceEpoch % 9000) + 1000}';
     final savedItems = List<CartItem>.from(cartItems);
+    final savedTotal = finalTotal;
+    final savedSubtotal = subtotal;
+    final savedDiscountAmount = discountAmount;
+    final savedServiceFee = serviceFee;
 
     final newOrder = OrderHistory(
       orderId: generatedOrderId,
       orderDate: DateTime.now(),
       itemNames: savedItems.map((e) => '${e.quantity}x ${e.menu.name}').toList(),
-      totalAmount: finalTotal,
-      subtotal: subtotal,
-      discountAmount: discountAmount,
-      serviceFee: serviceFee,
+      totalAmount: savedTotal,
+      subtotal: savedSubtotal,
+      discountAmount: savedDiscountAmount,
+      serviceFee: savedServiceFee,
       status: 'Sedang Dimasak',
       tableNumber: isTakeaway ? 'Bungkus (Takeaway)' : selectedTable,
       paymentMethod: paymentMethod,
@@ -484,8 +488,11 @@ class _OrderPageState extends State<OrderPage> {
           tableNumber: selectedTable,
           paymentMethod: paymentMethod,
           isTakeaway: isTakeaway,
-          totalAmount: finalTotal,
+          totalAmount: savedTotal,
           orderId: generatedOrderId,
+          subtotal: savedSubtotal,
+          serviceFee: savedServiceFee,
+          discountAmount: savedDiscountAmount,
         ),
       ),
     );

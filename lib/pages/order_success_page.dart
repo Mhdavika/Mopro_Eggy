@@ -9,6 +9,9 @@ class OrderSuccessPage extends StatelessWidget {
   final bool isTakeaway;
   final int totalAmount;
   final String orderId;
+  final int subtotal;
+  final int serviceFee;
+  final int discountAmount;
 
   const OrderSuccessPage({
     super.key,
@@ -18,12 +21,22 @@ class OrderSuccessPage extends StatelessWidget {
     required this.isTakeaway,
     required this.totalAmount,
     this.orderId = 'BS-042',
+    this.subtotal = 0,
+    this.serviceFee = 0,
+    this.discountAmount = 0,
   });
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final primaryColor = theme.colorScheme.primary;
+
+    final computedSubtotal = subtotal > 0
+        ? subtotal
+        : items.fold<int>(0, (sum, item) => sum + item.itemPrice);
+    final effectiveTotal = totalAmount > 0
+        ? totalAmount
+        : (computedSubtotal + serviceFee - discountAmount);
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8F9FA),
@@ -230,6 +243,14 @@ class OrderSuccessPage extends StatelessWidget {
                           );
                         }),
                         const Divider(height: 24),
+                        if (computedSubtotal > 0)
+                          _buildReceiptRow('Subtotal Menu', formatRupiah(computedSubtotal)),
+                        if (serviceFee > 0)
+                          _buildReceiptRow('Biaya Layanan Kantin', formatRupiah(serviceFee)),
+                        if (discountAmount > 0)
+                          _buildReceiptRow('Diskon Voucher', '- ${formatRupiah(discountAmount)}'),
+                        if (computedSubtotal > 0 || serviceFee > 0 || discountAmount > 0)
+                          const Divider(height: 16),
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
@@ -238,7 +259,7 @@ class OrderSuccessPage extends StatelessWidget {
                               style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                             ),
                             Text(
-                              formatRupiah(totalAmount),
+                              formatRupiah(effectiveTotal),
                               style: TextStyle(
                                 fontWeight: FontWeight.bold,
                                 fontSize: 18,
