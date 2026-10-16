@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../data/dummy_data.dart';
 import '../models/menu_item.dart';
+import '../services/cart_service.dart';
 import '../services/local_db_service.dart';
 import '../utils/formatters.dart';
 
@@ -18,23 +19,31 @@ class _MenuListPageState extends State<MenuListPage> {
   final TextEditingController _searchController = TextEditingController();
   final PageController _pageController = PageController();
   int _currentPromoIndex = 0;
-
-  // Local Cart State untuk quick action
-  final Map<String, int> _quickCart = {};
   Set<String> _favoriteIds = {};
 
   @override
   void initState() {
     super.initState();
     _loadFavorites();
+    CartService.instance.addListener(_onCartUpdated);
+  }
+
+  @override
+  void dispose() {
+    CartService.instance.removeListener(_onCartUpdated);
+    _searchController.dispose();
+    _pageController.dispose();
+    super.dispose();
+  }
+
+  void _onCartUpdated() {
+    if (mounted) setState(() {});
   }
 
   Future<void> _loadFavorites() async {
     final favs = await LocalDbService.instance.getFavorites();
     if (mounted) {
-      setState(() {
-        _favoriteIds = favs;
-      });
+      setState(() => _favoriteIds = favs);
     }
   }
 
@@ -53,13 +62,6 @@ class _MenuListPageState extends State<MenuListPage> {
     );
   }
 
-  @override
-  void dispose() {
-    _searchController.dispose();
-    _pageController.dispose();
-    super.dispose();
-  }
-
   List<MenuItem> get filteredMenu {
     return DummyData.menuList.where((item) {
       final matchesCategory =
@@ -71,61 +73,36 @@ class _MenuListPageState extends State<MenuListPage> {
     }).toList();
   }
 
-  int get totalCartItems {
-    return _quickCart.values.fold(0, (sum, count) => sum + count);
-  }
-
-  int get totalCartPrice {
-    int total = 0;
-    _quickCart.forEach((id, qty) {
-      final menu = DummyData.menuList.firstWhere((m) => m.id == id);
-      total += menu.price * qty;
-    });
-    return total;
-  }
-
   void _addToCart(MenuItem item) {
-    setState(() {
-      _quickCart[item.id] = (_quickCart[item.id] ?? 0) + 1;
-    });
+    CartService.instance.addItem(
+      menu: item,
+      quantity: 1,
+      selectedSpiceLevel: item.spiceLevels.isNotEmpty ? item.spiceLevels.first : '',
+    );
+
     ScaffoldMessenger.of(context).hideCurrentSnackBar();
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        duration: const Duration(milliseconds: 1500),
+        duration: const Duration(milliseconds: 1600),
         backgroundColor: Colors.deepOrange,
-        content: Text('${item.name} ditambahkan ke pesanan!'),
+        content: Text('${item.name} ditambahkan ke keranjang!'),
         action: SnackBarAction(
-          label: 'LIHAT',
+          label: 'LIHAT KERANJANG',
           textColor: Colors.white,
-          onPressed: _goToCheckout,
+          onPressed: () => Navigator.pushNamed(context, '/pesan'),
         ),
       ),
     );
   }
 
-  void _goToCheckout() {
-    List<CartItem> items = [];
-    if (_quickCart.isNotEmpty) {
-      _quickCart.forEach((id, qty) {
-        final menu = DummyData.menuList.firstWhere((m) => m.id == id);
-        items.add(CartItem(
-          menu: menu,
-          quantity: qty,
-          selectedSpiceLevel: menu.spiceLevels.isNotEmpty ? menu.spiceLevels.first : '',
-        ));
-      });
-    } else {
-      items = List.from(DummyData.sampleCart);
-    }
-    Navigator.pushNamed(context, '/pesan', arguments: items);
-  }
-
   @override
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
+    final isWeb = screenWidth >= 800;
     final primaryColor = Theme.of(context).colorScheme.primary;
+    final cartCount = CartService.instance.totalCount;
+    final cartSubtotal = CartService.instance.subtotal;
 
-    // Kalkulasi kolom grid responsif untuk mobile, tablet, dan web/laptop
     int crossAxisCount;
     double childAspectRatio;
     if (screenWidth < 600) {
@@ -143,50 +120,41 @@ class _MenuListPageState extends State<MenuListPage> {
     }
 
     return Scaffold(
-      backgroundColor: Colors.grey[50],
-      appBar: AppBar(
-        elevation: 0,
-        backgroundColor: primaryColor,
-        foregroundColor: Colors.white,
-        title: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 1200),
-            child: Row(
-              children: [
-                const Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Kantin Bu Sari',
-                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
-                      ),
-                      Text(
-                        'Gedung Maroon Labkom • Buka (07.30 - 16.30)',
-                        style: TextStyle(fontSize: 11, color: Colors.white70),
-                      ),
-                    ],
+      backgroundColor: const Color(0xFFF8F9FA),
+      // Hanya tampilkan AppBar jika di mobile (di Web sudah ada Web Navbar dari MainNavigationPage)
+      appBar: isWeb
+          ? null
+          : AppBar(
+              elevation: 0,
+              backgroundColor: primaryColor,
+              foregroundColor: Colors.white,
+              title: const Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Kantin Bu Sari',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
                   ),
-                ),
+                  Text(
+                    'Gedung Maroon Labkom • Buka (07.30 - 16.30)',
+                    style: TextStyle(fontSize: 11, color: Colors.white70),
+                  ),
+                ],
+              ),
+              actions: [
                 IconButton(
                   icon: const Icon(Icons.history),
                   tooltip: 'Riwayat Pesanan',
                   onPressed: () => Navigator.pushNamed(context, '/riwayat'),
                 ),
-                IconButton(
-                  icon: const Icon(Icons.person_outline),
-                  tooltip: 'Profil & Info Kantin',
-                  onPressed: () => Navigator.pushNamed(context, '/profil'),
-                ),
-                // Badge Icon Keranjang
                 Stack(
                   children: [
                     IconButton(
                       icon: const Icon(Icons.shopping_bag_outlined),
                       tooltip: 'Keranjang Pesanan',
-                      onPressed: _goToCheckout,
+                      onPressed: () => Navigator.pushNamed(context, '/pesan'),
                     ),
-                    if (totalCartItems > 0)
+                    if (cartCount > 0)
                       Positioned(
                         right: 8,
                         top: 8,
@@ -198,7 +166,7 @@ class _MenuListPageState extends State<MenuListPage> {
                           ),
                           constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
                           child: Text(
-                            '$totalCartItems',
+                            '$cartCount',
                             style: const TextStyle(
                               color: Colors.brown,
                               fontSize: 10,
@@ -210,59 +178,106 @@ class _MenuListPageState extends State<MenuListPage> {
                       ),
                   ],
                 ),
+                const SizedBox(width: 4),
               ],
             ),
-          ),
-        ),
-      ),
       body: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 1200),
           child: CustomScrollView(
             slivers: [
-              // 1. Search Bar
+              // 1. Search Bar & Status Header
               SliverToBoxAdapter(
                 child: Container(
-                  color: primaryColor,
-                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(12),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.08),
-                          blurRadius: 6,
-                          offset: const Offset(0, 3),
-                        ),
-                      ],
-                    ),
-                    child: TextField(
-                      controller: _searchController,
-                      decoration: InputDecoration(
-                        hintText: 'Cari ayam geprek, es teh, soto, mendoan...',
-                        hintStyle: TextStyle(fontSize: 13, color: Colors.grey[500]),
-                        prefixIcon: const Icon(Icons.search, color: Colors.deepOrange),
-                        suffixIcon: searchQuery.isNotEmpty
-                            ? IconButton(
-                                icon: const Icon(Icons.clear, size: 18),
-                                onPressed: () {
-                                  setState(() {
-                                    _searchController.clear();
-                                    searchQuery = '';
-                                  });
-                                },
-                              )
-                            : null,
-                        border: InputBorder.none,
-                        contentPadding: const EdgeInsets.symmetric(vertical: 12),
+                  margin: EdgeInsets.all(isWeb ? 20 : 16),
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.04),
+                        blurRadius: 10,
+                        offset: const Offset(0, 3),
                       ),
-                      onChanged: (val) {
-                        setState(() {
-                          searchQuery = val;
-                        });
-                      },
-                    ),
+                    ],
+                  ),
+                  child: Column(
+                    children: [
+                      if (isWeb) ...[
+                        Row(
+                          children: [
+                            const Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Selamat Datang di Kantin Bu Sari!',
+                                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+                                  ),
+                                  SizedBox(height: 2),
+                                  Text(
+                                    'Pesan makanan & minuman khas kantin kampus langsung dari laptop atau smartphone.',
+                                    style: TextStyle(fontSize: 12, color: Colors.grey),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 16),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                              decoration: BoxDecoration(
+                                color: Colors.green.shade50,
+                                borderRadius: BorderRadius.circular(20),
+                                border: Border.all(color: Colors.green.shade300),
+                              ),
+                              child: const Row(
+                                children: [
+                                  Icon(Icons.circle, color: Colors.green, size: 8),
+                                  SizedBox(width: 6),
+                                  Text(
+                                    'Dapur Siap Menerima Order',
+                                    style: TextStyle(color: Colors.green, fontSize: 12, fontWeight: FontWeight.bold),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 16),
+                      ],
+                      Container(
+                        decoration: BoxDecoration(
+                          color: Colors.grey[100],
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: Colors.grey.shade300),
+                        ),
+                        child: TextField(
+                          controller: _searchController,
+                          decoration: InputDecoration(
+                            hintText: 'Cari menu makanan, minuman, snack favoritmu...',
+                            hintStyle: TextStyle(fontSize: 13, color: Colors.grey[500]),
+                            prefixIcon: const Icon(Icons.search, color: Colors.deepOrange),
+                            suffixIcon: searchQuery.isNotEmpty
+                                ? IconButton(
+                                    icon: const Icon(Icons.clear, size: 18),
+                                    onPressed: () {
+                                      setState(() {
+                                        _searchController.clear();
+                                        searchQuery = '';
+                                      });
+                                    },
+                                  )
+                                : null,
+                            border: InputBorder.none,
+                            contentPadding: const EdgeInsets.symmetric(vertical: 14),
+                          ),
+                          onChanged: (val) {
+                            setState(() => searchQuery = val);
+                          },
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ),
@@ -273,19 +288,16 @@ class _MenuListPageState extends State<MenuListPage> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const SizedBox(height: 12),
                       SizedBox(
-                        height: 130,
+                        height: isWeb ? 150 : 130,
                         child: PageView.builder(
                           controller: _pageController,
                           itemCount: DummyData.promoBanners.length,
-                          onPageChanged: (idx) {
-                            setState(() => _currentPromoIndex = idx);
-                          },
+                          onPageChanged: (idx) => setState(() => _currentPromoIndex = idx),
                           itemBuilder: (context, index) {
                             final banner = DummyData.promoBanners[index];
                             return Container(
-                              margin: const EdgeInsets.symmetric(horizontal: 16),
+                              margin: EdgeInsets.symmetric(horizontal: isWeb ? 20 : 16),
                               decoration: BoxDecoration(
                                 gradient: LinearGradient(
                                   colors: [
@@ -304,7 +316,7 @@ class _MenuListPageState extends State<MenuListPage> {
                                   ),
                                 ],
                               ),
-                              padding: const EdgeInsets.all(16),
+                              padding: const EdgeInsets.all(20),
                               child: Row(
                                 children: [
                                   Expanded(
@@ -319,25 +331,26 @@ class _MenuListPageState extends State<MenuListPage> {
                                             borderRadius: BorderRadius.circular(6),
                                           ),
                                           child: Text(
-                                            'KODE PROMO: ${banner['code']}',
+                                            'KODE VOUCHER: ${banner['code']}',
                                             style: const TextStyle(
                                               color: Colors.white,
                                               fontSize: 10,
                                               fontWeight: FontWeight.bold,
+                                              letterSpacing: 1,
                                             ),
                                           ),
                                         ),
-                                        const SizedBox(height: 6),
+                                        const SizedBox(height: 8),
                                         Text(
                                           banner['title'] as String,
                                           style: const TextStyle(
                                             color: Colors.white,
                                             fontWeight: FontWeight.bold,
-                                            fontSize: 15,
+                                            fontSize: 17,
                                           ),
                                           maxLines: 1,
                                         ),
-                                        const SizedBox(height: 2),
+                                        const SizedBox(height: 4),
                                         Text(
                                           banner['subtitle'] as String,
                                           style: const TextStyle(
@@ -349,11 +362,7 @@ class _MenuListPageState extends State<MenuListPage> {
                                       ],
                                     ),
                                   ),
-                                  const Icon(
-                                    Icons.local_fire_department,
-                                    color: Colors.amber,
-                                    size: 44,
-                                  ),
+                                  const Icon(Icons.local_fire_department, color: Colors.amber, size: 52),
                                 ],
                               ),
                             );
@@ -361,7 +370,6 @@ class _MenuListPageState extends State<MenuListPage> {
                         ),
                       ),
                       const SizedBox(height: 8),
-                      // Dots Indicator
                       Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: List.generate(
@@ -384,7 +392,7 @@ class _MenuListPageState extends State<MenuListPage> {
               // 3. Category Filter Chips & View Mode Switcher
               SliverToBoxAdapter(
                 child: Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                  padding: EdgeInsets.fromLTRB(isWeb ? 20 : 16, 20, isWeb ? 20 : 16, 10),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -392,24 +400,21 @@ class _MenuListPageState extends State<MenuListPage> {
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           const Text(
-                            'Pilihan Kategori Menu',
-                            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                            'Kategori Menu Kantin',
+                            style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
                           ),
-                          // View switcher button
                           IconButton(
                             visualDensity: VisualDensity.compact,
                             icon: Icon(
                               isGridView ? Icons.view_list : Icons.grid_view,
                               color: primaryColor,
                             ),
-                            tooltip: isGridView ? 'Ganti ke Tampilan List' : 'Ganti ke Tampilan Grid',
-                            onPressed: () {
-                              setState(() => isGridView = !isGridView);
-                            },
+                            tooltip: isGridView ? 'Tampilan List' : 'Tampilan Grid',
+                            onPressed: () => setState(() => isGridView = !isGridView),
                           ),
                         ],
                       ),
-                      const SizedBox(height: 6),
+                      const SizedBox(height: 8),
                       SingleChildScrollView(
                         scrollDirection: Axis.horizontal,
                         child: Row(
@@ -427,18 +432,16 @@ class _MenuListPageState extends State<MenuListPage> {
                                   fontSize: 13,
                                 ),
                                 onSelected: (selected) {
-                                  if (selected) {
-                                    setState(() => selectedCategory = category);
-                                  }
+                                  if (selected) setState(() => selectedCategory = category);
                                 },
                               ),
                             );
                           }).toList(),
                         ),
                       ),
-                      const SizedBox(height: 8),
+                      const SizedBox(height: 10),
                       Text(
-                        'Menampilkan ${filteredMenu.length} menu ${selectedCategory != "Semua" ? "di kategori $selectedCategory" : ""}:',
+                        'Menampilkan ${filteredMenu.length} menu ${selectedCategory != "Semua" ? "pada kategori $selectedCategory" : ""}:',
                         style: TextStyle(fontSize: 12, color: Colors.grey[600]),
                       ),
                     ],
@@ -446,7 +449,7 @@ class _MenuListPageState extends State<MenuListPage> {
                 ),
               ),
 
-              // 4. Menu Items (Responsif Grid atau List)
+              // 4. Menu Items
               if (filteredMenu.isEmpty)
                 SliverFillRemaining(
                   hasScrollBody: false,
@@ -456,17 +459,14 @@ class _MenuListPageState extends State<MenuListPage> {
                       children: [
                         Icon(Icons.search_off, size: 64, color: Colors.grey[400]),
                         const SizedBox(height: 12),
-                        Text(
-                          'Menu "$searchQuery" tidak ditemukan',
-                          style: TextStyle(color: Colors.grey[600], fontSize: 14),
-                        ),
+                        Text('Menu "$searchQuery" tidak ditemukan', style: TextStyle(color: Colors.grey[600], fontSize: 14)),
                       ],
                     ),
                   ),
                 )
               else if (isGridView)
                 SliverPadding(
-                  padding: const EdgeInsets.fromLTRB(16, 4, 16, 90),
+                  padding: EdgeInsets.fromLTRB(isWeb ? 20 : 16, 4, isWeb ? 20 : 16, 90),
                   sliver: SliverGrid(
                     gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                       crossAxisCount: crossAxisCount,
@@ -486,7 +486,7 @@ class _MenuListPageState extends State<MenuListPage> {
                 )
               else
                 SliverPadding(
-                  padding: const EdgeInsets.fromLTRB(16, 4, 16, 90),
+                  padding: EdgeInsets.fromLTRB(isWeb ? 20 : 16, 4, isWeb ? 20 : 16, 90),
                   sliver: SliverList(
                     delegate: SliverChildBuilderDelegate(
                       (context, index) {
@@ -503,8 +503,8 @@ class _MenuListPageState extends State<MenuListPage> {
         ),
       ),
 
-      // 5. Floating Bottom Bar bila ada isi di keranjang
-      bottomSheet: totalCartItems > 0
+      // 5. Floating Bottom Cart Bar (jika ada item di keranjang)
+      bottomSheet: cartCount > 0
           ? Center(
               child: ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: 1200),
@@ -528,11 +528,11 @@ class _MenuListPageState extends State<MenuListPage> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              '$totalCartItems Menu Dipilih',
+                              '$cartCount Menu di Keranjang',
                               style: TextStyle(fontSize: 12, color: Colors.grey[600]),
                             ),
                             Text(
-                              formatRupiah(totalCartPrice),
+                              formatRupiah(cartSubtotal),
                               style: TextStyle(
                                 fontSize: 18,
                                 fontWeight: FontWeight.bold,
@@ -549,9 +549,9 @@ class _MenuListPageState extends State<MenuListPage> {
                             padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 12),
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                           ),
-                          onPressed: _goToCheckout,
+                          onPressed: () => Navigator.pushNamed(context, '/pesan'),
                           icon: const Icon(Icons.arrow_forward),
-                          label: const Text('Lanjut Pesan', style: TextStyle(fontWeight: FontWeight.bold)),
+                          label: const Text('Buka Keranjang', style: TextStyle(fontWeight: FontWeight.bold)),
                         ),
                       ],
                     ),
@@ -563,7 +563,6 @@ class _MenuListPageState extends State<MenuListPage> {
     );
   }
 
-  // Widget Card untuk Grid View
   Widget _buildGridCard(MenuItem item, Color primaryColor, bool isFav) {
     return Card(
       elevation: 1,
@@ -578,7 +577,6 @@ class _MenuListPageState extends State<MenuListPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Image & Badges
             Expanded(
               child: Stack(
                 fit: StackFit.expand,
@@ -605,11 +603,7 @@ class _MenuListPageState extends State<MenuListPage> {
                         ),
                         child: const Text(
                           'BEST SELLER',
-                          style: TextStyle(
-                            fontSize: 9,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.brown,
-                          ),
+                          style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Colors.brown),
                         ),
                       ),
                     ),
@@ -620,10 +614,7 @@ class _MenuListPageState extends State<MenuListPage> {
                       onTap: () => _toggleFavorite(item),
                       child: Container(
                         padding: const EdgeInsets.all(4),
-                        decoration: const BoxDecoration(
-                          color: Colors.black38,
-                          shape: BoxShape.circle,
-                        ),
+                        decoration: const BoxDecoration(color: Colors.black38, shape: BoxShape.circle),
                         child: Icon(
                           isFav ? Icons.favorite : Icons.favorite_border,
                           color: isFav ? Colors.redAccent : Colors.white,
@@ -648,11 +639,7 @@ class _MenuListPageState extends State<MenuListPage> {
                           const SizedBox(width: 3),
                           Text(
                             '${item.rating}',
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 10,
-                              fontWeight: FontWeight.bold,
-                            ),
+                            style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
                           ),
                         ],
                       ),
@@ -661,8 +648,6 @@ class _MenuListPageState extends State<MenuListPage> {
                 ],
               ),
             ),
-
-            // Content Info
             Padding(
               padding: const EdgeInsets.all(10),
               child: Column(
@@ -679,21 +664,14 @@ class _MenuListPageState extends State<MenuListPage> {
                     children: [
                       Text(
                         formatRupiah(item.price),
-                        style: TextStyle(
-                          color: primaryColor,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 13,
-                        ),
+                        style: TextStyle(color: primaryColor, fontWeight: FontWeight.bold, fontSize: 13),
                       ),
                       const Spacer(),
                       InkWell(
                         onTap: () => _addToCart(item),
                         child: Container(
                           padding: const EdgeInsets.all(5),
-                          decoration: BoxDecoration(
-                            color: primaryColor,
-                            shape: BoxShape.circle,
-                          ),
+                          decoration: BoxDecoration(color: primaryColor, shape: BoxShape.circle),
                           child: const Icon(Icons.add, color: Colors.white, size: 16),
                         ),
                       ),
@@ -708,7 +686,6 @@ class _MenuListPageState extends State<MenuListPage> {
     );
   }
 
-  // Widget Card untuk List View
   Widget _buildListCard(MenuItem item, Color primaryColor, bool isFav) {
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
@@ -749,10 +726,7 @@ class _MenuListPageState extends State<MenuListPage> {
                     Row(
                       children: [
                         Expanded(
-                          child: Text(
-                            item.name,
-                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-                          ),
+                          child: Text(item.name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
                         ),
                         InkWell(
                           onTap: () => _toggleFavorite(item),
@@ -776,21 +750,14 @@ class _MenuListPageState extends State<MenuListPage> {
                       children: [
                         Text(
                           formatRupiah(item.price),
-                          style: TextStyle(
-                            color: primaryColor,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 13,
-                          ),
+                          style: TextStyle(color: primaryColor, fontWeight: FontWeight.bold, fontSize: 13),
                         ),
                         const SizedBox(width: 8),
                         Row(
                           children: [
                             const Icon(Icons.star, color: Colors.amber, size: 13),
                             const SizedBox(width: 2),
-                            Text(
-                              '${item.rating} (${item.reviewCount})',
-                              style: TextStyle(fontSize: 11, color: Colors.grey[600]),
-                            ),
+                            Text('${item.rating} (${item.reviewCount})', style: TextStyle(fontSize: 11, color: Colors.grey[600])),
                           ],
                         ),
                         const Spacer(),

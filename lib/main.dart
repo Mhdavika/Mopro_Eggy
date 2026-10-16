@@ -11,7 +11,11 @@ import 'services/local_db_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await LocalDbService.instance.init();
+  try {
+    await LocalDbService.instance.init();
+  } catch (e) {
+    debugPrint('Database initialization warning: $e');
+  }
   runApp(const MyApp());
 }
 

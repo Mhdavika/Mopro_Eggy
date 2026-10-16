@@ -26,269 +26,276 @@ class OrderSuccessPage extends StatelessWidget {
     final primaryColor = theme.colorScheme.primary;
 
     return Scaffold(
-      backgroundColor: Colors.grey[50],
+      backgroundColor: const Color(0xFFF8F9FA),
       appBar: AppBar(
-        title: const Text('Struk Pesanan Digital'),
+        title: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 650),
+            child: const Text('Struk & Konfirmasi Pembayaran', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 17)),
+          ),
+        ),
         backgroundColor: primaryColor,
         foregroundColor: Colors.white,
         automaticallyImplyLeading: false,
       ),
       body: Center(
         child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 650),
+          constraints: const BoxConstraints(maxWidth: 620),
           child: SingleChildScrollView(
-            padding: const EdgeInsets.all(20),
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
             child: Column(
               children: [
-            // 1. Icon Sukses
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: Colors.green.shade50,
-                shape: BoxShape.circle,
-                border: Border.all(color: Colors.green.shade300, width: 2),
-              ),
-              child: const Icon(
-                Icons.check_circle_rounded,
-                color: Colors.green,
-                size: 72,
-              ),
-            ),
-            const SizedBox(height: 16),
-
-            // 2. Judul & Pesan
-            const Text(
-              'Pesanan Berhasil Dibuat!',
-              style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              'Silakan tunjukkan nomor antrean ini ke kasir Bu Sari',
-              style: TextStyle(color: Colors.grey[600], fontSize: 13),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 20),
-
-            // 3. Card Nomor Antrean
-            Card(
-              elevation: 2,
-              color: primaryColor,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 24),
-                child: Column(
-                  children: [
-                    const Text(
-                      'NOMOR ANTREAN KAMU',
-                      style: TextStyle(
-                        color: Colors.white70,
-                        fontSize: 12,
-                        letterSpacing: 1.5,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      '#$orderId',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 36,
-                        fontWeight: FontWeight.w900,
-                        letterSpacing: 2,
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.2),
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(Icons.access_time, size: 16, color: Colors.white),
-                          const SizedBox(width: 6),
-                          Text(
-                            'Estimasi Penyajian: ± 10-15 Menit',
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
+                // 1. Icon Sukses
+                Container(
+                  padding: const EdgeInsets.all(18),
+                  decoration: BoxDecoration(
+                    color: Colors.green.shade50,
+                    shape: BoxShape.circle,
+                    border: Border.all(color: Colors.green.shade300, width: 2),
+                  ),
+                  child: const Icon(
+                    Icons.check_circle_rounded,
+                    color: Colors.green,
+                    size: 64,
+                  ),
                 ),
-              ),
-            ),
-            const SizedBox(height: 20),
+                const SizedBox(height: 14),
 
-            // 4. Stepper Status Pesanan
-            Card(
-              elevation: 0.5,
-              color: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Status Pesanan Saat Ini',
-                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
-                    ),
-                    const SizedBox(height: 16),
-                    Row(
+                // 2. Judul
+                const Text(
+                  'Pembayaran & Pesanan Berhasil!',
+                  style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Data pesanan sudah tersimpan di database lokal laptop dan diteruskan ke dapur Bu Sari.',
+                  style: TextStyle(color: Colors.grey[600], fontSize: 13),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 20),
+
+                // 3. Card Nomor Antrean
+                Card(
+                  elevation: 2,
+                  color: primaryColor,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 24),
+                    child: Column(
                       children: [
-                        _buildStatusStep('Diterima', Icons.receipt_long, true, true),
-                        _buildStatusConnector(true),
-                        _buildStatusStep('Dimasak', Icons.soup_kitchen, true, false),
-                        _buildStatusConnector(false),
-                        _buildStatusStep('Siap Ambil', Icons.dinner_dining, false, false),
+                        const Text(
+                          'NOMOR ANTREAN PESANAN',
+                          style: TextStyle(
+                            color: Colors.white70,
+                            fontSize: 12,
+                            letterSpacing: 1.5,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          '#$orderId',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 36,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: 2,
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.2),
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: const Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.access_time, size: 16, color: Colors.white),
+                              SizedBox(width: 6),
+                              Text(
+                                'Estimasi Selesai: ± 10-15 Menit',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                       ],
                     ),
-                  ],
+                  ),
                 ),
-              ),
-            ),
-            const SizedBox(height: 20),
+                const SizedBox(height: 16),
 
-            // 5. Struk Rincian Pesanan
-            Card(
-              elevation: 0.5,
-              color: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                // 4. Stepper Status Pesanan
+                Card(
+                  elevation: 0.8,
+                  color: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                  child: Padding(
+                    padding: const EdgeInsets.all(18),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          'Rincian Transaksi',
+                        const Text(
+                          'Status Proses Dapur',
                           style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
                         ),
-                        Icon(Icons.qr_code, size: 28, color: Colors.grey),
+                        const SizedBox(height: 16),
+                        Row(
+                          children: [
+                            _buildStatusStep('Diterima', Icons.receipt_long, true, true),
+                            _buildStatusConnector(true),
+                            _buildStatusStep('Dimasak', Icons.soup_kitchen, true, false),
+                            _buildStatusConnector(false),
+                            _buildStatusStep('Siap Ambil', Icons.dinner_dining, false, false),
+                          ],
+                        ),
                       ],
                     ),
-                    const Divider(height: 24),
-                    _buildReceiptRow('Lokasi Santap', isTakeaway ? 'Bungkus (Takeaway)' : tableNumber),
-                    _buildReceiptRow('Metode Pembayaran', paymentMethod),
-                    _buildReceiptRow('Waktu Pesan', 'Hari ini, ${TimeOfDay.now().format(context)}'),
-                    const Divider(height: 24),
-                    const Text(
-                      'Menu Dipesan:',
-                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-                    ),
-                    const SizedBox(height: 8),
-                    ...items.map((cartItem) {
-                      return Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 4),
-                        child: Row(
+                  ),
+                ),
+                const SizedBox(height: 16),
+
+                // 5. Struk Rincian Pesanan
+                Card(
+                  elevation: 0.8,
+                  color: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                  child: Padding(
+                    padding: const EdgeInsets.all(18),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    '${cartItem.quantity}x ${cartItem.menu.name}',
-                                    style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                            Text(
+                              'Struk Transaksi Digital',
+                              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                            ),
+                            Icon(Icons.qr_code, size: 28, color: Colors.grey),
+                          ],
+                        ),
+                        const Divider(height: 24),
+                        _buildReceiptRow('Tempat Santap', isTakeaway ? 'Bungkus (Takeaway)' : tableNumber),
+                        _buildReceiptRow('Metode Pembayaran', paymentMethod),
+                        _buildReceiptRow('Status Pembayaran', 'Lunas / Berhasil'),
+                        _buildReceiptRow('Waktu Transaksi', 'Hari ini, ${TimeOfDay.now().format(context)}'),
+                        const Divider(height: 24),
+                        const Text(
+                          'Menu yang Dipesan:',
+                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                        ),
+                        const SizedBox(height: 8),
+                        ...items.map((cartItem) {
+                          return Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 4),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        '${cartItem.quantity}x ${cartItem.menu.name}',
+                                        style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                                      ),
+                                      if (cartItem.selectedSpiceLevel.isNotEmpty)
+                                        Text(
+                                          '• Varian: ${cartItem.selectedSpiceLevel}',
+                                          style: TextStyle(fontSize: 11, color: Colors.grey[600]),
+                                        ),
+                                      if (cartItem.selectedToppings.isNotEmpty)
+                                        Text(
+                                          '• Topping: ${cartItem.selectedToppings.map((t) => t.name).join(", ")}',
+                                          style: TextStyle(fontSize: 11, color: Colors.grey[600]),
+                                        ),
+                                    ],
                                   ),
-                                  if (cartItem.selectedSpiceLevel.isNotEmpty)
-                                    Text(
-                                      '• ${cartItem.selectedSpiceLevel}',
-                                      style: TextStyle(fontSize: 11, color: Colors.grey[600]),
-                                    ),
-                                  if (cartItem.selectedToppings.isNotEmpty)
-                                    Text(
-                                      '• Topping: ${cartItem.selectedToppings.map((t) => t.name).join(", ")}',
-                                      style: TextStyle(fontSize: 11, color: Colors.grey[600]),
-                                    ),
-                                ],
-                              ),
+                                ),
+                                Text(
+                                  formatRupiah(cartItem.itemPrice),
+                                  style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                                ),
+                              ],
+                            ),
+                          );
+                        }),
+                        const Divider(height: 24),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Text(
+                              'Total Pembayaran',
+                              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                             ),
                             Text(
-                              formatRupiah(cartItem.itemPrice),
-                              style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                              formatRupiah(totalAmount),
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 18,
+                                color: primaryColor,
+                              ),
                             ),
                           ],
                         ),
-                      );
-                    }),
-                    const Divider(height: 24),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Text(
-                          'Total Pembayaran',
-                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                        ),
-                        Text(
-                          formatRupiah(totalAmount),
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 18,
-                            color: primaryColor,
-                          ),
-                        ),
                       ],
                     ),
-                  ],
+                  ),
                 ),
-              ),
-            ),
-            const SizedBox(height: 24),
+                const SizedBox(height: 20),
 
-            // 6. Tombol Aksi
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton.icon(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: primaryColor,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                // 6. Tombol Aksi
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: primaryColor,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 15),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    onPressed: () {
+                      Navigator.popUntil(context, (route) => route.isFirst);
+                    },
+                    icon: const Icon(Icons.home),
+                    label: const Text('Kembali ke Daftar Menu', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                  ),
                 ),
-                onPressed: () {
-                  Navigator.popUntil(context, (route) => route.isFirst);
-                },
-                icon: const Icon(Icons.home),
-                label: const Text('Kembali ke Daftar Menu', style: TextStyle(fontWeight: FontWeight.bold)),
-              ),
-            ),
-            const SizedBox(height: 10),
-            SizedBox(
-              width: double.infinity,
-              child: OutlinedButton.icon(
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: primaryColor,
-                  side: BorderSide(color: primaryColor),
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                const SizedBox(height: 10),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: primaryColor,
+                      side: BorderSide(color: primaryColor),
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    onPressed: () {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Struk berhasil disimpan ke perangkat!')),
+                      );
+                    },
+                    icon: const Icon(Icons.download),
+                    label: const Text('Unduh Struk PDF / Gambar'),
+                  ),
                 ),
-                onPressed: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Struk berhasil disimpan ke perangkat!')),
-                  );
-                },
-                icon: const Icon(Icons.download),
-                label: const Text('Unduh Struk PDF / Gambar'),
-              ),
+                const SizedBox(height: 30),
+              ],
             ),
-            const SizedBox(height: 30),
-          ],
+          ),
         ),
       ),
-    ),
-  ),
-);
+    );
   }
 
   Widget _buildStatusStep(String label, IconData icon, bool isActive, bool isCompleted) {

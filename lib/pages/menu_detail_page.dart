@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../data/dummy_data.dart';
 import '../models/menu_item.dart';
+import '../services/cart_service.dart';
 import '../services/local_db_service.dart';
 import '../utils/formatters.dart';
 
@@ -42,9 +43,7 @@ class _MenuDetailPageState extends State<MenuDetailPage> {
 
   Future<void> _checkFavorite() async {
     final fav = await LocalDbService.instance.isFavorite(item.id);
-    if (mounted) {
-      setState(() => isFavorite = fav);
-    }
+    if (mounted) setState(() => isFavorite = fav);
   }
 
   Future<void> _toggleFavorite() async {
@@ -56,9 +55,7 @@ class _MenuDetailPageState extends State<MenuDetailPage> {
       SnackBar(
         duration: const Duration(milliseconds: 1200),
         content: Text(
-          isFavorite
-              ? '${item.name} disimpan ke database lokal!'
-              : 'Dihapus dari favorit',
+          isFavorite ? '${item.name} disimpan ke favorit!' : 'Dihapus dari favorit',
         ),
       ),
     );
@@ -77,12 +74,12 @@ class _MenuDetailPageState extends State<MenuDetailPage> {
     return (item.price + toppingsTotal) * quantity;
   }
 
-  void _proceedToOrder() {
+  void _addToCartOnly() {
     final selectedToppingsList = item.availableToppings
         .where((t) => selectedToppingIds.contains(t.id))
         .toList();
 
-    final cartItem = CartItem(
+    CartService.instance.addItem(
       menu: item,
       quantity: quantity,
       selectedSpiceLevel: selectedSpice,
@@ -90,7 +87,19 @@ class _MenuDetailPageState extends State<MenuDetailPage> {
       specialNotes: _notesController.text.trim(),
     );
 
-    Navigator.pushNamed(context, '/pesan', arguments: cartItem);
+    ScaffoldMessenger.of(context).hideCurrentSnackBar();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        duration: const Duration(milliseconds: 1500),
+        backgroundColor: Colors.deepOrange,
+        content: Text('$quantity porsi ${item.name} masuk ke keranjang!'),
+      ),
+    );
+  }
+
+  void _proceedToOrder() {
+    _addToCartOnly();
+    Navigator.pushNamed(context, '/pesan');
   }
 
   @override
@@ -101,13 +110,16 @@ class _MenuDetailPageState extends State<MenuDetailPage> {
     final isDesktopOrWeb = screenWidth >= 800;
 
     if (isDesktopOrWeb) {
-      // Tampilan Responsif Layar Lebar / Web / Laptop (Two-Column Layout)
       return Scaffold(
-        backgroundColor: Colors.grey[50],
+        backgroundColor: const Color(0xFFF8F9FA),
         appBar: AppBar(
           title: Text(item.name),
           backgroundColor: primaryColor,
           foregroundColor: Colors.white,
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back),
+            onPressed: () => Navigator.pop(context),
+          ),
           actions: [
             IconButton(
               icon: Icon(
@@ -126,7 +138,7 @@ class _MenuDetailPageState extends State<MenuDetailPage> {
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Kolom Kiri: Gambar Besar & Info
+                  // Kolom Kiri
                   Expanded(
                     flex: 5,
                     child: Card(
@@ -136,18 +148,15 @@ class _MenuDetailPageState extends State<MenuDetailPage> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          ClipRRect(
-                            borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-                            child: Image.network(
-                              item.imageUrl,
+                          Image.network(
+                            item.imageUrl,
+                            height: 320,
+                            width: double.infinity,
+                            fit: BoxFit.cover,
+                            errorBuilder: (c, e, s) => Container(
                               height: 320,
-                              width: double.infinity,
-                              fit: BoxFit.cover,
-                              errorBuilder: (c, e, s) => Container(
-                                height: 320,
-                                color: Colors.deepOrange.shade100,
-                                child: const Icon(Icons.fastfood, size: 80, color: Colors.deepOrange),
-                              ),
+                              color: Colors.deepOrange.shade100,
+                              child: const Icon(Icons.fastfood, size: 80, color: Colors.deepOrange),
                             ),
                           ),
                           Padding(
@@ -186,7 +195,7 @@ class _MenuDetailPageState extends State<MenuDetailPage> {
                   ),
                   const SizedBox(width: 24),
 
-                  // Kolom Kanan: Pilihan Varian, Topping, & Order Form
+                  // Kolom Kanan
                   Expanded(
                     flex: 5,
                     child: Column(
@@ -206,7 +215,7 @@ class _MenuDetailPageState extends State<MenuDetailPage> {
       );
     }
 
-    // Tampilan Mobile (Single Column dengan SliverAppBar)
+    // Tampilan Mobile
     return Scaffold(
       backgroundColor: Colors.grey[50],
       body: CustomScrollView(
@@ -234,14 +243,12 @@ class _MenuDetailPageState extends State<MenuDetailPage> {
                   Image.network(
                     item.imageUrl,
                     fit: BoxFit.cover,
-                    errorBuilder: (context, error, stackTrace) {
-                      return Container(
-                        color: Colors.deepOrange.shade100,
-                        child: const Center(
-                          child: Icon(Icons.fastfood, size: 80, color: Colors.deepOrange),
-                        ),
-                      );
-                    },
+                    errorBuilder: (context, error, stackTrace) => Container(
+                      color: Colors.deepOrange.shade100,
+                      child: const Center(
+                        child: Icon(Icons.fastfood, size: 80, color: Colors.deepOrange),
+                      ),
+                    ),
                   ),
                   const DecoratedBox(
                     decoration: BoxDecoration(
@@ -261,7 +268,7 @@ class _MenuDetailPageState extends State<MenuDetailPage> {
                   isFavorite ? Icons.favorite : Icons.favorite_border,
                   color: isFavorite ? Colors.redAccent : Colors.white,
                 ),
-                tooltip: 'Simpan ke Favorit Lokal',
+                tooltip: 'Simpan ke Favorit',
                 onPressed: _toggleFavorite,
               ),
             ],
@@ -272,7 +279,6 @@ class _MenuDetailPageState extends State<MenuDetailPage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Harga
                   Row(
                     children: [
                       Text(
@@ -306,7 +312,6 @@ class _MenuDetailPageState extends State<MenuDetailPage> {
                     ],
                   ),
                   const SizedBox(height: 12),
-                  // Chips
                   Wrap(
                     spacing: 8,
                     children: [
@@ -316,13 +321,11 @@ class _MenuDetailPageState extends State<MenuDetailPage> {
                     ],
                   ),
                   const SizedBox(height: 16),
-                  // Deskripsi
                   Text(
                     item.description,
                     style: TextStyle(fontSize: 14, color: Colors.grey[800], height: 1.5),
                   ),
                   const SizedBox(height: 20),
-                  // Opsi Kustomisasi
                   _buildCustomizationOptions(primaryColor),
                   const SizedBox(height: 80),
                 ],
@@ -453,19 +456,35 @@ class _MenuDetailPageState extends State<MenuDetailPage> {
               ],
             ),
             const SizedBox(height: 16),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton.icon(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: primaryColor,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: primaryColor,
+                      side: BorderSide(color: primaryColor),
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                    onPressed: _addToCartOnly,
+                    child: const Text('+ Keranjang', style: TextStyle(fontWeight: FontWeight.bold)),
+                  ),
                 ),
-                onPressed: _proceedToOrder,
-                icon: const Icon(Icons.shopping_cart),
-                label: const Text('Lanjut Pesan Sekarang', style: TextStyle(fontWeight: FontWeight.bold)),
-              ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: primaryColor,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                    onPressed: _proceedToOrder,
+                    icon: const Icon(Icons.shopping_cart),
+                    label: const Text('Beli Sekarang', style: TextStyle(fontWeight: FontWeight.bold)),
+                  ),
+                ),
+              ],
             ),
           ],
         ),

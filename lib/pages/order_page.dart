@@ -1,6 +1,7 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
-import '../data/dummy_data.dart';
 import '../models/menu_item.dart';
+import '../services/cart_service.dart';
 import '../services/local_db_service.dart';
 import '../utils/formatters.dart';
 import 'order_success_page.dart';
@@ -13,9 +14,6 @@ class OrderPage extends StatefulWidget {
 }
 
 class _OrderPageState extends State<OrderPage> {
-  late List<CartItem> cartItems;
-  bool isInitialized = false;
-
   String selectedTable = 'Meja 03 (Dekat Jendela)';
   final List<String> tableOptions = [
     'Meja 01 (Depan Kasir)',
@@ -28,9 +26,24 @@ class _OrderPageState extends State<OrderPage> {
 
   String paymentMethod = 'QRIS Instant';
   final List<Map<String, dynamic>> paymentOptions = [
-    {'id': 'QRIS Instant', 'title': 'QRIS (Semua E-Wallet & M-Banking)', 'icon': Icons.qr_code_scanner},
-    {'id': 'Tunai di Kasir', 'title': 'Bayar Tunai Langsung ke Bu Sari', 'icon': Icons.payments_outlined},
-    {'id': 'Saldo Mahasiswa', 'title': 'Kartu Mahasiswa / Labkom Pay', 'icon': Icons.credit_card},
+    {
+      'id': 'QRIS Instant',
+      'title': 'QRIS (GoPay, OVO, Dana, ShopeePay, M-Banking)',
+      'icon': Icons.qr_code_scanner,
+      'badge': 'Otomatis'
+    },
+    {
+      'id': 'Tunai di Kasir',
+      'title': 'Bayar Tunai Langsung ke Bu Sari di Gerai',
+      'icon': Icons.payments_outlined,
+      'badge': 'Manual'
+    },
+    {
+      'id': 'Saldo Mahasiswa',
+      'title': 'Kartu Mahasiswa / Labkom Pay (Database Lokal)',
+      'icon': Icons.account_balance_wallet,
+      'badge': 'Instan'
+    },
   ];
 
   bool isTakeaway = false;
@@ -40,29 +53,25 @@ class _OrderPageState extends State<OrderPage> {
   final TextEditingController _voucherController = TextEditingController();
 
   @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    if (!isInitialized) {
-      final args = ModalRoute.of(context)?.settings.arguments;
-      if (args is CartItem) {
-        cartItems = [args];
-      } else if (args is List<CartItem>) {
-        cartItems = List.from(args);
-      } else {
-        cartItems = List.from(DummyData.sampleCart);
-      }
-      isInitialized = true;
-    }
+  void initState() {
+    super.initState();
+    CartService.instance.addListener(_onCartUpdated);
   }
 
   @override
   void dispose() {
+    CartService.instance.removeListener(_onCartUpdated);
     _voucherController.dispose();
     super.dispose();
   }
 
-  int get subtotal => cartItems.fold(0, (sum, item) => sum + item.itemPrice);
-  int get serviceFee => 1000;
+  void _onCartUpdated() {
+    if (mounted) setState(() {});
+  }
+
+  List<CartItem> get cartItems => CartService.instance.items;
+  int get subtotal => CartService.instance.subtotal;
+  int get serviceFee => cartItems.isEmpty ? 0 : 1000;
   int get finalTotal {
     int total = subtotal + serviceFee - discountAmount;
     return total < 0 ? 0 : total;
@@ -95,15 +104,322 @@ class _OrderPageState extends State<OrderPage> {
     }
   }
 
-  Future<void> _confirmOrder() async {
-    if (cartItems.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Keranjang belanja kosong!')),
+  // ALUR SIMULASI PEMBAYARAN NYATA
+  Future<void> _handlePaymentFlow() async {
+    if (cartItems.isEmpty) return;
+
+    if (paymentMethod == 'QRIS Instant') {
+      _showQrisPaymentDialog();
+    } else if (paymentMethod == 'Saldo Mahasiswa') {
+      _showWalletPaymentDialog();
+    } else {
+      _showCashPaymentDialog();
+    }
+  }
+
+  // 1. DIALOG SIMULASI PEMBAYARAN QRIS NYATA
+  void _showQrisPaymentDialog() {
+    int remainingSeconds = 900; // 15 menit
+    Timer? timer;
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (dialogContext, setDialogState) {
+            timer ??= Timer.periodic(const Duration(seconds: 1), (t) {
+              if (remainingSeconds > 0) {
+                setDialogState(() => remainingSeconds--);
+              } else {
+                t.cancel();
+              }
+            });
+
+            final minutes = (remainingSeconds ~/ 60).toString().padLeft(2, '0');
+            final seconds = (remainingSeconds % 60).toString().padLeft(2, '0');
+
+            return AlertDialog(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+              titlePadding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
+              title: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: Colors.red.shade50,
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(color: Colors.red.shade300),
+                    ),
+                    child: const Text(
+                      'QRIS',
+                      style: TextStyle(fontWeight: FontWeight.w900, color: Colors.red, letterSpacing: 1),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  const Expanded(
+                    child: Text('Scan QRIS untuk Bayar', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close),
+                    onPressed: () {
+                      timer?.cancel();
+                      Navigator.pop(ctx);
+                    },
+                  ),
+                ],
+              ),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      'Selesaikan pembayaran dalam waktu $minutes:$seconds',
+                      style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                    ),
+                    const SizedBox(height: 14),
+
+                    // Kotak QR Code Realistis
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: Colors.grey.shade300),
+                        boxShadow: [
+                          BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 10),
+                        ],
+                      ),
+                      child: Column(
+                        children: [
+                          const Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.storefront, size: 16, color: Colors.deepOrange),
+                              SizedBox(width: 6),
+                              Text(
+                                'Kantin Bu Sari - Labkom',
+                                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 10),
+                          // QR Code Container
+                          Container(
+                            width: 180,
+                            height: 180,
+                            decoration: BoxDecoration(
+                              color: Colors.grey[50],
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: Colors.grey.shade400, width: 1.5),
+                            ),
+                            child: Stack(
+                              alignment: Alignment.center,
+                              children: [
+                                const Icon(Icons.qr_code_2, size: 160, color: Colors.black87),
+                                Container(
+                                  padding: const EdgeInsets.all(4),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white,
+                                    shape: BoxShape.circle,
+                                    border: Border.all(color: Colors.deepOrange, width: 2),
+                                  ),
+                                  child: const Icon(Icons.restaurant, size: 20, color: Colors.deepOrange),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                          Text(
+                            'NMID: ID1020268891238',
+                            style: TextStyle(fontSize: 10, color: Colors.grey[500], letterSpacing: 0.8),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            formatRupiah(finalTotal),
+                            style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.deepOrange),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+
+                    // Petunjuk e-wallet
+                    Text(
+                      'Mendukung GoPay, OVO, DANA, ShopeePay, BCA, Mandiri, dll.',
+                      style: TextStyle(fontSize: 11, color: Colors.grey[600]),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Tombol Simulasi Sukses
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.green,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                        onPressed: () {
+                          timer?.cancel();
+                          Navigator.pop(ctx);
+                          _finishOrderSuccess();
+                        },
+                        icon: const Icon(Icons.check_circle),
+                        label: const Text('Simulasikan Pembayaran Berhasil', style: TextStyle(fontWeight: FontWeight.bold)),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  // 2. DIALOG PEMBAYARAN SALDO MAHASISWA
+  Future<void> _showWalletPaymentDialog() async {
+    final currentBal = await LocalDbService.instance.getWalletBalance();
+
+    if (!mounted) return;
+
+    if (currentBal < finalTotal) {
+      // Saldo Kurang
+      showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Row(
+            children: [
+              Icon(Icons.warning_amber_rounded, color: Colors.red),
+              SizedBox(width: 8),
+              Text('Saldo Tidak Cukup'),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Saldo Labkom Pay Anda saat ini: ${formatRupiah(currentBal)}'),
+              const SizedBox(height: 6),
+              Text('Total tagihan pesanan: ${formatRupiah(finalTotal)}'),
+              const SizedBox(height: 12),
+              const Text(
+                'Silakan pilih metode bayar lain (QRIS / Tunai) atau Top Up saldo di halaman Profil.',
+                style: TextStyle(fontSize: 13, color: Colors.grey),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Ganti Metode Bayar')),
+          ],
+        ),
       );
       return;
     }
 
-    // Tampilkan loading dialog
+    // Saldo Cukup - Konfirmasi Potong Saldo
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.credit_card, color: Colors.deepOrange),
+            SizedBox(width: 8),
+            Text('Konfirmasi Potong Saldo'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Saldo awal: ${formatRupiah(currentBal)}'),
+            Text('Potongan: ${formatRupiah(finalTotal)}', style: const TextStyle(color: Colors.red)),
+            const Divider(height: 16),
+            Text(
+              'Sisa saldo setelah bayar: ${formatRupiah(currentBal - finalTotal)}',
+              style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.green),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Batal')),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.deepOrange, foregroundColor: Colors.white),
+            onPressed: () async {
+              Navigator.pop(ctx);
+              await LocalDbService.instance.updateWalletBalance(currentBal - finalTotal);
+              _finishOrderSuccess();
+            },
+            child: const Text('Bayar Sekarang'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // 3. DIALOG PEMBAYARAN TUNAI DI KASIR
+  void _showCashPaymentDialog() {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.payments_outlined, color: Colors.deepOrange),
+            SizedBox(width: 8),
+            Text('Instruksi Bayar Tunai'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Pesanan Anda akan langsung diteruskan ke dapur Bu Sari.',
+              style: TextStyle(fontSize: 13),
+            ),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.amber.shade50,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: Colors.amber.shade400),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('Mohon siapkan uang pas:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 4),
+                  Text(formatRupiah(finalTotal), style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: Colors.deepOrange)),
+                  const SizedBox(height: 6),
+                  const Text('Tunjukkan nomor antrean digital ke kasir Bu Sari.', style: TextStyle(fontSize: 11)),
+                ],
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Kembali')),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.deepOrange, foregroundColor: Colors.white),
+            onPressed: () {
+              Navigator.pop(ctx);
+              _finishOrderSuccess();
+            },
+            child: const Text('Buat Pesanan'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // FINALIZE & SAVE ORDER
+  Future<void> _finishOrderSuccess() async {
+    // Tampilkan loading sebentar
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -116,7 +432,7 @@ class _OrderPageState extends State<OrderPage> {
               children: [
                 CircularProgressIndicator(color: Colors.deepOrange),
                 SizedBox(height: 16),
-                Text('Menyimpan ke database lokal & mengirim ke Bu Sari...'),
+                Text('Menyimpan ke database lokal laptop...'),
               ],
             ),
           ),
@@ -124,38 +440,47 @@ class _OrderPageState extends State<OrderPage> {
       ),
     );
 
-    // Generate Order ID & simpan ke database lokal
     final generatedOrderId = 'BS-${(DateTime.now().millisecondsSinceEpoch % 9000) + 1000}';
+    final savedItems = List<CartItem>.from(cartItems);
+
     final newOrder = OrderHistory(
       orderId: generatedOrderId,
       orderDate: DateTime.now(),
-      itemNames: cartItems.map((e) => '${e.quantity}x ${e.menu.name}').toList(),
+      itemNames: savedItems.map((e) => '${e.quantity}x ${e.menu.name}').toList(),
       totalAmount: finalTotal,
+      subtotal: subtotal,
+      discountAmount: discountAmount,
+      serviceFee: serviceFee,
       status: 'Sedang Dimasak',
       tableNumber: isTakeaway ? 'Bungkus (Takeaway)' : selectedTable,
+      paymentMethod: paymentMethod,
+      isTakeaway: isTakeaway,
+      detailedItems: savedItems.map((e) => {
+        'name': e.menu.name,
+        'quantity': e.quantity,
+        'price': e.itemPrice,
+        'spice': e.selectedSpiceLevel,
+        'toppings': e.selectedToppings.map((t) => t.name).join(', '),
+        'notes': e.specialNotes,
+      }).toList(),
     );
 
-    // Simpan ke SharedPreferences lokal
+    // Simpan ke database lokal SharedPreferences
     await LocalDbService.instance.saveOrder(newOrder);
 
-    // Jika bayar pakai Saldo Mahasiswa, potong saldo
-    if (paymentMethod == 'Saldo Mahasiswa') {
-      final currentBal = await LocalDbService.instance.getWalletBalance();
-      if (currentBal >= finalTotal) {
-        await LocalDbService.instance.updateWalletBalance(currentBal - finalTotal);
-      }
-    }
+    // Kosongkan keranjang belanja
+    CartService.instance.clearCart();
 
-    await Future.delayed(const Duration(milliseconds: 800));
+    await Future.delayed(const Duration(milliseconds: 600));
 
     if (!mounted) return;
-    Navigator.pop(context); // Tutup dialog
+    Navigator.pop(context); // Tutup loading
 
     Navigator.pushReplacement(
       context,
       MaterialPageRoute(
         builder: (context) => OrderSuccessPage(
-          items: cartItems,
+          items: savedItems,
           tableNumber: selectedTable,
           paymentMethod: paymentMethod,
           isTakeaway: isTakeaway,
@@ -174,44 +499,96 @@ class _OrderPageState extends State<OrderPage> {
     final isDesktopOrWeb = screenWidth >= 850;
 
     return Scaffold(
-      backgroundColor: Colors.grey[50],
+      backgroundColor: const Color(0xFFF8F9FA),
       appBar: AppBar(
+        elevation: 0,
+        backgroundColor: primaryColor,
+        foregroundColor: Colors.white,
         title: Center(
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 1100),
-            child: const Text('Konfirmasi & Keranjang Pesanan'),
+            child: Row(
+              children: [
+                const Expanded(
+                  child: Text('Keranjang Belanja & Pembayaran', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+                ),
+                if (cartItems.isNotEmpty)
+                  TextButton.icon(
+                    style: TextButton.styleFrom(foregroundColor: Colors.white),
+                    onPressed: () {
+                      CartService.instance.clearCart();
+                    },
+                    icon: const Icon(Icons.delete_sweep, size: 18),
+                    label: const Text('Kosongkan'),
+                  ),
+              ],
+            ),
           ),
         ),
-        backgroundColor: primaryColor,
-        foregroundColor: Colors.white,
       ),
       body: cartItems.isEmpty
+          // 1. TAMPILAN KERANJANG KOSONG (EMPTY STATE)
           ? Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.shopping_cart_outlined, size: 72, color: Colors.grey[400]),
-                  const SizedBox(height: 16),
-                  const Text('Keranjang kamu masih kosong', style: TextStyle(fontSize: 16)),
-                  const SizedBox(height: 16),
-                  ElevatedButton(
-                    onPressed: () => Navigator.pop(context),
-                    child: const Text('Pilih Menu Sekarang'),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 500),
+                child: Padding(
+                  padding: const EdgeInsets.all(32),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(28),
+                        decoration: BoxDecoration(
+                          color: Colors.deepOrange.shade50,
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(Icons.shopping_bag_outlined, size: 80, color: Colors.deepOrange.shade300),
+                      ),
+                      const SizedBox(height: 24),
+                      const Text(
+                        'Keranjang Belanja Masih Kosong',
+                        style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Kamu belum menambahkan menu makanan atau minuman. Yuk pilih menu lezat di Kantin Bu Sari!',
+                        style: TextStyle(fontSize: 14, color: Colors.grey[600]),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 24),
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton.icon(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: primaryColor,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          ),
+                          onPressed: () {
+                            Navigator.popUntil(context, (route) => route.isFirst);
+                          },
+                          icon: const Icon(Icons.restaurant_menu),
+                          label: const Text('Mulai Pilih Menu Sekarang', style: TextStyle(fontWeight: FontWeight.bold)),
+                        ),
+                      ),
+                    ],
                   ),
-                ],
+                ),
               ),
             )
+          // 2. TAMPILAN JIKA KERANJANG BERISI
           : Center(
               child: ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: 1100),
                 child: isDesktopOrWeb
-                    // LAYOUT RESPONSIF DESKTOP / WEB (2 KOLOM)
                     ? SingleChildScrollView(
                         padding: const EdgeInsets.all(24),
                         child: Row(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            // Kolom Kiri: Pengaturan Meja & Pembayaran
+                            // Kolom Kiri
                             Expanded(
                               flex: 5,
                               child: Column(
@@ -224,7 +601,7 @@ class _OrderPageState extends State<OrderPage> {
                               ),
                             ),
                             const SizedBox(width: 24),
-                            // Kolom Kanan: Daftar Item & Rincian Pembayaran
+                            // Kolom Kanan
                             Expanded(
                               flex: 5,
                               child: Column(
@@ -241,7 +618,6 @@ class _OrderPageState extends State<OrderPage> {
                           ],
                         ),
                       )
-                    // LAYOUT RESPONSIF MOBILE (1 KOLOM)
                     : SingleChildScrollView(
                         padding: const EdgeInsets.all(16),
                         child: Column(
@@ -267,11 +643,11 @@ class _OrderPageState extends State<OrderPage> {
 
   Widget _buildTableAndOptionCard(Color primaryColor) {
     return Card(
-      elevation: 0.5,
+      elevation: 0.8,
       color: Colors.white,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(18),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -279,17 +655,17 @@ class _OrderPageState extends State<OrderPage> {
               children: [
                 Icon(Icons.place, color: Colors.deepOrange),
                 SizedBox(width: 8),
-                Text('Informasi Meja & Pemesanan', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                Text('Informasi Meja & Tempat Santap', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
               ],
             ),
             const Divider(height: 20),
             if (!isTakeaway) ...[
-              const Text('Pilih Nomor Meja Kamu:', style: TextStyle(fontSize: 13)),
+              const Text('Nomor Meja Kamu di Kantin:', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
               const SizedBox(height: 8),
               DropdownButtonFormField<String>(
                 initialValue: selectedTable,
                 decoration: InputDecoration(
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
                 ),
                 items: tableOptions.map((table) {
@@ -305,7 +681,7 @@ class _OrderPageState extends State<OrderPage> {
               contentPadding: EdgeInsets.zero,
               activeTrackColor: primaryColor,
               title: const Text('Bungkus / Take Away', style: TextStyle(fontSize: 14)),
-              subtitle: const Text('Pesanan dikemas rapi untuk dibawa pulang', style: TextStyle(fontSize: 12)),
+              subtitle: const Text('Pesanan dikemas kotak untuk dibawa pulang/ke lab', style: TextStyle(fontSize: 12)),
               value: isTakeaway,
               onChanged: (val) => setState(() => isTakeaway = val),
             ),
@@ -326,7 +702,13 @@ class _OrderPageState extends State<OrderPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text('Pesanan Kamu:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text('Daftar Menu (${cartItems.length} Macam)', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+            Text('${CartService.instance.totalCount} Porsi', style: TextStyle(fontSize: 12, color: Colors.grey[600])),
+          ],
+        ),
         const SizedBox(height: 8),
         ...cartItems.asMap().entries.map((entry) {
           final index = entry.key;
@@ -334,30 +716,30 @@ class _OrderPageState extends State<OrderPage> {
 
           return Card(
             margin: const EdgeInsets.only(bottom: 12),
-            elevation: 0.5,
+            elevation: 0.8,
             color: Colors.white,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
             child: Padding(
-              padding: const EdgeInsets.all(12),
+              padding: const EdgeInsets.all(14),
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   ClipRRect(
-                    borderRadius: BorderRadius.circular(8),
+                    borderRadius: BorderRadius.circular(10),
                     child: Image.network(
                       item.menu.imageUrl,
-                      width: 64,
-                      height: 64,
+                      width: 68,
+                      height: 68,
                       fit: BoxFit.cover,
                       errorBuilder: (c, e, s) => Container(
-                        width: 64,
-                        height: 64,
+                        width: 68,
+                        height: 68,
                         color: Colors.deepOrange.shade100,
                         child: const Icon(Icons.fastfood, color: Colors.deepOrange),
                       ),
                     ),
                   ),
-                  const SizedBox(width: 12),
+                  const SizedBox(width: 14),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -378,7 +760,7 @@ class _OrderPageState extends State<OrderPage> {
                     children: [
                       IconButton(
                         icon: const Icon(Icons.delete_outline, color: Colors.red, size: 20),
-                        onPressed: () => setState(() => cartItems.removeAt(index)),
+                        onPressed: () => CartService.instance.removeItem(index),
                       ),
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
@@ -390,15 +772,15 @@ class _OrderPageState extends State<OrderPage> {
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             InkWell(
-                              onTap: item.quantity > 1 ? () => setState(() => item.quantity--) : null,
+                              onTap: () => CartService.instance.updateQuantity(index, item.quantity - 1),
                               child: const Icon(Icons.remove, size: 16),
                             ),
                             Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: 6),
+                              padding: const EdgeInsets.symmetric(horizontal: 8),
                               child: Text('${item.quantity}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
                             ),
                             InkWell(
-                              onTap: () => setState(() => item.quantity++),
+                              onTap: () => CartService.instance.updateQuantity(index, item.quantity + 1),
                               child: const Icon(Icons.add, size: 16),
                             ),
                           ],
@@ -417,9 +799,9 @@ class _OrderPageState extends State<OrderPage> {
 
   Widget _buildVoucherCard(Color primaryColor) {
     return Card(
-      elevation: 0.5,
+      elevation: 0.8,
       color: Colors.white,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
       child: Padding(
         padding: const EdgeInsets.all(12),
         child: Row(
@@ -431,7 +813,7 @@ class _OrderPageState extends State<OrderPage> {
                 controller: _voucherController,
                 textCapitalization: TextCapitalization.characters,
                 decoration: const InputDecoration(
-                  hintText: 'Kode Promo (Cth: HEMATKANTIN)',
+                  hintText: 'Kode Voucher (Cth: HEMATKANTIN)',
                   isDense: true,
                   border: InputBorder.none,
                 ),
@@ -456,12 +838,12 @@ class _OrderPageState extends State<OrderPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text('Pilihan Metode Pembayaran:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+        const Text('Pilih Metode Pembayaran:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
         const SizedBox(height: 8),
         Card(
-          elevation: 0.5,
+          elevation: 0.8,
           color: Colors.white,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
           child: Column(
             children: paymentOptions.map((opt) {
               final isSelected = paymentMethod == opt['id'];
@@ -469,13 +851,29 @@ class _OrderPageState extends State<OrderPage> {
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 tileColor: isSelected ? primaryColor.withValues(alpha: 0.05) : null,
                 leading: Icon(opt['icon'] as IconData, color: isSelected ? primaryColor : Colors.grey),
-                title: Text(
-                  opt['id'] as String,
-                  style: TextStyle(
-                    fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                    fontSize: 14,
-                    color: isSelected ? primaryColor : Colors.black87,
-                  ),
+                title: Row(
+                  children: [
+                    Text(
+                      opt['id'] as String,
+                      style: TextStyle(
+                        fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                        fontSize: 14,
+                        color: isSelected ? primaryColor : Colors.black87,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: isSelected ? Colors.deepOrange.shade100 : Colors.grey.shade200,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(
+                        opt['badge'] as String,
+                        style: TextStyle(fontSize: 10, color: isSelected ? Colors.deepOrange : Colors.grey[700]),
+                      ),
+                    ),
+                  ],
                 ),
                 subtitle: Text(opt['title'] as String, style: const TextStyle(fontSize: 12)),
                 trailing: Icon(
@@ -495,11 +893,11 @@ class _OrderPageState extends State<OrderPage> {
     return Column(
       children: [
         Card(
-          elevation: 0.5,
+          elevation: 0.8,
           color: Colors.white,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
           child: Padding(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.all(18),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -516,7 +914,7 @@ class _OrderPageState extends State<OrderPage> {
                     const Text('Total Pembayaran', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                     Text(
                       formatRupiah(finalTotal),
-                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: primaryColor),
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 20, color: primaryColor),
                     ),
                   ],
                 ),
@@ -535,7 +933,7 @@ class _OrderPageState extends State<OrderPage> {
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
               elevation: 2,
             ),
-            onPressed: _confirmOrder,
+            onPressed: _handlePaymentFlow,
             icon: const Icon(Icons.check_circle_outline),
             label: Text(
               'Konfirmasi & Bayar (${formatRupiah(finalTotal)})',
